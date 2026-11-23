@@ -1,0 +1,150 @@
+name: Patcher Quest/OpenXR para Celular (Monado + Giroscopio + Hand Tracking)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: "Link direto do .apk OU link de pasta Gofile (https://gofile.io/d/...)"
+        required: true
+        type: string
+      obb_url:
+        description: "Link direto opcional do .obb (deixe vazio se ja estiver na pasta Gofile ou se nao houver OBB)"
+        required: false
+        default: ""
+        type: string
+      process_obb:
+        description: "Baixar e otimizar tambem o arquivo .obb (pode levar alguns minutos para OBBs grandes)"
+        required: false
+        default: false
+        type: boolean
+      texture_quality:
+        description: "Reducao de qualidade grafica/texturas (Unity QualitySettings)"
+        required: false
+        default: "low"
+        type: choice
+        options:
+          - low
+          - medium
+          - ultra_low
+          - original
+      max_texture_size:
+        description: "Redimensionar Texture2D acima de N pixels (0 = somente mipmap, mais rapido e seguro)"
+        required: false
+        default: "0"
+        type: choice
+        options:
+          - "0"
+          - "512"
+          - "256"
+          - "1024"
+      swap_openxr_loader:
+        description: "Trocar libopenxr_loader.so da Meta pelo loader oficial da Khronos (para conectar ao Monado)"
+        required: false
+        default: true
+        type: boolean
+      openxr_loader_version:
+        description: "Versao do Khronos openxr_loader_for_android (Maven Central)"
+        required: false
+        default: "1.1.62"
+        type: string
+
+jobs:
+  patch-apk:
+    name: Adaptar APK para Celular (Monado OpenXR)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar scripts do repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias Python (UnityPy + Pillow)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Instalar Apktool 2.11.1
+        run: |
+          sudo curl -fLo /usr/local/bin/apktool.jar \
+            "https://github.com/iBotPeaches/Apktool/releases/download/v2.11.1/apktool_2.11.1.jar"
+          sudo curl -fLo /usr/local/bin/apktool \
+            "https://raw.githubusercontent.com/iBotPeaches/Apktool/v2.11.1/scripts/linux/apktool"
+          sudo chmod a+x /usr/local/bin/apktool.jar /usr/local/bin/apktool
+          apktool --version
+
+      - name: Baixar APK (e OBB se ativado)
+        id: download
+        env:
+          INPUT_APK_URL: ${{ inputs.apk_url }}
+          INPUT_OBB_URL: ${{ inputs.obb_url }}
+          INPUT_PROCESS_OBB: ${{ inputs.process_obb }}
+        run: |
+          mkdir -p work/input work/output
+          ARGS=(--apk-url "$INPUT_APK_URL" --out-dir work/input)
+          if [ -n "$INPUT_OBB_URL" ]; then
+            ARGS+=(--obb-url "$INPUT_OBB_URL")
+          fi
+          if [ "$INPUT_PROCESS_OBB" != "true" ]; then
+            ARGS+=(--skip-obb)
+          fi
+          python3 scripts/download_source.py "${ARGS[@]}"
+          APK_FILE=$(python3 -c 'import json; print(json.load(open("work/input/downloaded.json"))["apk"])')
+          OBB_FILE=$(python3 -c 'import json; print(json.load(open("work/input/downloaded.json"))["obb"])')
+          echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
+          echo "obb_file=$OBB_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Aplicar patch OpenXR/Monado e reducao de texturas
+        env:
+          APK_FILE: ${{ steps.download.outputs.apk_file }}
+          OBB_FILE: ${{ steps.download.outputs.obb_file }}
+          TEXTURE_QUALITY: ${{ inputs.texture_quality }}
+          MAX_TEXTURE_SIZE: ${{ inputs.max_texture_size }}
+          SWAP_LOADER: ${{ inputs.swap_openxr_loader }}
+          OPENXR_VER: ${{ inputs.openxr_loader_version }}
+        run: |
+          BASE_APK=$(basename "$APK_FILE" .apk)
+          OUT_APK="work/output/${BASE_APK}-monado-${TEXTURE_QUALITY}.apk"
+
+          ARGS=(
+            --apk "$APK_FILE"
+            --out-apk "$OUT_APK"
+            --report "work/output/compatibility-report.md"
+            --texture-preset "$TEXTURE_QUALITY"
+            --max-texture-size "$MAX_TEXTURE_SIZE"
+            --openxr-version "$OPENXR_VER"
+          )
+
+          if [ "$SWAP_LOADER" != "true" ]; then
+            ARGS+=(--no-swap-loader)
+          fi
+
+          if [ -n "$OBB_FILE" ] && [ -f "$OBB_FILE" ]; then
+            OBB_NAME=$(basename "$OBB_FILE")
+            ARGS+=(--obb "$OBB_FILE" --out-obb "work/output/${OBB_NAME}")
+          fi
+
+          python3 scripts/patch_apk_for_monado.py "${ARGS[@]}"
+
+          echo "### Resumo da execucao" >> "$GITHUB_STEP_SUMMARY"
+          cat work/output/compatibility-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar APK patcheado e relatorio nos Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-monado-celular-${{ inputs.texture_quality }}
+          path: |
+            work/output/*.apk
+            work/output/*.obb
+            work/output/compatibility-report.md
+          retention-days: 7
+          if-no-files-found: error
