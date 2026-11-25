@@ -1,6 +1,7 @@
 import { licensing } from "@/lib/licensing";
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 import { badRequest, json, readJson, serverError, tooMany } from "@/lib/http";
+import { withPublicCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
  *
  * Libera o assento para o usuário ativar em outro aparelho.
  */
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const limit = rateLimit(`deactivate:ip:${clientIp(req)}`, 30, 60_000);
     if (!limit.ok) return tooMany(limit.retryAfter);
@@ -32,3 +33,6 @@ export async function POST(req: Request) {
     return serverError(e);
   }
 }
+
+export const POST = withPublicCors(handlePOST);
+export const OPTIONS = withPublicCors(() => new Response(null, { status: 204 }));

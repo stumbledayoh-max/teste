@@ -237,6 +237,22 @@ webView.addJavascriptInterface(LicenseBridge(this), "LicenseNative")
 
 E, no JS: `window.LicenseNative?.onLicense(JSON.stringify({ ok: lic.isLicensed() }))`.
 
+**Checklist do APK** (o servidor de licenças roda fora do app, por HTTPS):
+
+1. `<uses-permission android:name="android.permission.INTERNET" />` (padrão em quase todo projeto).
+2. WebView com `settings.domStorageEnabled = true` — o `deviceId` e o token ficam no `localStorage`.
+   Se preferir não usar localStorage, passe um `storage` próprio no construtor do `LicenseClient`.
+3. Aponte o SDK para o servidor publicado:
+   `new LicenseClient({ baseUrl: "https://SEU-PROJETO.vercel.app", product: "meu-app" })`.
+4. As rotas públicas respondem `Access-Control-Allow-Origin: *` (sem cookies), então funciona com o
+   HTML carregado de `file://`, `appassets://` ou de outro domínio. As rotas `/api/admin` não são
+   CORS-abertas de propósito.
+5. HTTPS é obrigatório (sem `usesCleartextTraffic`). Domínio precisa ser público — em projeto Vercel
+   com **Deployment Protection → Vercel Authentication** ligada, até o app recebe a tela de login;
+   desligue a proteção em produção (ou use um domínio próprio).
+6. Sem rede o app continua abrindo por até `graceDays` (7 por padrão) usando o último `lastOk`;
+   depois disso `isLicensed()` vira `false` até validar de novo.
+
 > Regra: nunca coloque a `service_role` key nem a lógica de decidir "válido" no APK. O binário é
 > inspecionável; o que protege é a key nunca estar em claro no banco, o token ser assinado e a
 > revogação ser checada no servidor.

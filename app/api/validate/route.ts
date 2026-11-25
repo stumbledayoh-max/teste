@@ -1,6 +1,7 @@
 import { licensing } from "@/lib/licensing";
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 import { badRequest, json, readJson, serverError, tooMany } from "@/lib/http";
+import { withPublicCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
  * É o endpoint que o app chama no boot e no heartbeat. Revogação e expiração
  * sempre vencem aqui, mesmo que o token local ainda esteja assinado.
  */
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const limit = rateLimit(`validate:ip:${clientIp(req)}`, 120, 60_000);
     if (!limit.ok) return tooMany(limit.retryAfter);
@@ -41,3 +42,6 @@ export async function POST(req: Request) {
     return serverError(e);
   }
 }
+
+export const POST = withPublicCors(handlePOST);
+export const OPTIONS = withPublicCors(() => new Response(null, { status: 204 }));

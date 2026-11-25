@@ -1,6 +1,7 @@
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 import { licensing } from "@/lib/licensing";
 import { badRequest, json, readJson, serverError, tooMany } from "@/lib/http";
+import { withPublicCors } from "@/lib/cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ interface Body {
  * { key, deviceId, deviceName?, platform? }
  * → { ok, token, expiresAt, license }
  */
-export async function POST(req: Request) {
+async function handlePOST(req: Request) {
   try {
     const ip = clientIp(req);
     const ipLimit = rateLimit(`activate:ip:${ip}`, 20, 5 * 60_000);
@@ -57,3 +58,6 @@ export async function POST(req: Request) {
     return serverError(e);
   }
 }
+
+export const POST = withPublicCors(handlePOST);
+export const OPTIONS = withPublicCors(() => new Response(null, { status: 204 }));
