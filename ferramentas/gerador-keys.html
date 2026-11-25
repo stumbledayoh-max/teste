@@ -1,0 +1,746 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Gerador de keys — offline (1 arquivo, sem banco)</title>
+<style>
+  :root{
+    --bg:#060910; --panel:rgba(255,255,255,.04); --line:rgba(255,255,255,.09);
+    --line-strong:rgba(255,255,255,.16); --text:#e8eefc; --muted:#8b9ab4;
+    --accent:#38e8b0; --accent-2:#5aa9ff; --danger:#ff6b7a; --warn:#ffc861;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100dvh; color:var(--text); font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    background:
+      radial-gradient(900px 520px at 10% -10%,rgba(56,232,176,.13),transparent 60%),
+      radial-gradient(800px 460px at 95% 0%,rgba(90,169,255,.12),transparent 55%),
+      linear-gradient(180deg,#060910,#0a0f1a 45%,#05070d);
+    line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 64px}
+  h1{font-size:clamp(1.7rem,3.4vw,2.4rem);line-height:1.1;letter-spacing:-.02em;margin:0 0 10px}
+  h2{font-size:1.05rem;letter-spacing:-.01em;margin:0 0 4px}
+  p{margin:0 0 10px;color:var(--muted)}
+  .muted{color:var(--muted)}
+  .small{font-size:.84rem}
+  code,pre,.mono{font-family:var(--mono)}
+  pre{margin:0;padding:13px 15px;background:rgba(2,5,10,.78);border:1px solid var(--line);border-radius:12px;overflow:auto;font-size:.78rem;line-height:1.6;color:#c7d4ea;max-height:320px}
+  header.top{display:flex;align-items:center;gap:10px;margin-bottom:26px;flex-wrap:wrap}
+  .logo{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent-2));color:#04120d;font-weight:900}
+  .brand{font-weight:700;letter-spacing:-.01em}
+  .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid var(--line-strong);color:var(--muted);white-space:nowrap}
+  .badge.ok{color:var(--accent);border-color:rgba(56,232,176,.4);background:rgba(56,232,176,.1)}
+  .badge.bad{color:var(--danger);border-color:rgba(255,107,122,.4);background:rgba(255,107,122,.1)}
+  .badge.warn{color:var(--warn);border-color:rgba(255,200,97,.4);background:rgba(255,200,97,.1)}
+  .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .card{background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:16px;padding:20px}
+  .card.accent{border-color:rgba(56,232,176,.28);box-shadow:0 0 0 1px rgba(56,232,176,.07)}
+  .grid{display:grid;gap:14px}
+  .two{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+  .fields{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  label.field{display:grid;gap:5px;font-size:.73rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  input,select,textarea{width:100%;font:inherit;font-size:.93rem;color:var(--text);background:rgba(3,6,12,.66);border:1px solid var(--line-strong);border-radius:11px;padding:10px 12px;outline:none}
+  input:focus,select:focus,textarea:focus{border-color:rgba(56,232,176,.6);box-shadow:0 0 0 3px rgba(56,232,176,.14)}
+  textarea{resize:vertical;min-height:74px;font-family:var(--mono);font-size:.8rem}
+  button{font:inherit;font-weight:650;cursor:pointer;border-radius:11px;border:1px solid var(--line-strong);background:rgba(255,255,255,.06);color:var(--text);padding:10px 15px;transition:background .15s,transform .05s}
+  button:hover:not(:disabled){background:rgba(255,255,255,.1)}
+  button:active:not(:disabled){transform:translateY(1px)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  button.primary{background:linear-gradient(135deg,var(--accent),#24c9a0);border-color:transparent;color:#04120d}
+  button.primary:hover:not(:disabled){filter:brightness(1.06);background:linear-gradient(135deg,var(--accent),#24c9a0)}
+  button.tiny{padding:6px 10px;font-size:.76rem;border-radius:8px}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse;font-size:.85rem}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+  th{font-size:.68rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.03)}
+  tr:last-child td{border-bottom:none}
+  td.key{font-family:var(--mono);letter-spacing:.05em}
+  .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:340px}
+  .alert{border-radius:11px;padding:10px 13px;font-size:.86rem;border:1px solid var(--line-strong);background:var(--panel)}
+  .alert.ok{border-color:rgba(56,232,176,.35);background:rgba(56,232,176,.09);color:#c9ffee}
+  .alert.bad{border-color:rgba(255,107,122,.35);background:rgba(255,107,122,.09);color:#ffd7dc}
+  .alert.warn{border-color:rgba(255,200,97,.35);background:rgba(255,200,97,.08);color:#ffe9bf}
+  .hr{height:1px;background:var(--line);border:0;margin:18px 0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.84rem}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0;font-family:var(--mono);word-break:break-all}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:#0d1a16;border:1px solid rgba(56,232,176,.45);color:#c9ffee;padding:9px 16px;border-radius:11px;font-size:.85rem;transition:.2s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .tabs{display:flex;gap:6px;margin:0 0 16px;flex-wrap:wrap}
+  .tabs button{padding:8px 13px;font-size:.86rem;border-radius:10px;background:transparent;color:var(--muted)}
+  .tabs button[aria-selected="true"]{background:rgba(56,232,176,.12);color:var(--text);box-shadow:inset 0 0 0 1px rgba(56,232,176,.25)}
+  [hidden]{display:none !important}
+  footer{margin-top:26px;color:var(--muted);font-size:.8rem;border-top:1px solid var(--line);padding-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <span class="logo" aria-hidden="true">K</span>
+    <span class="brand">Gerador de keys · offline</span>
+    <span class="badge ok"><span class="dot"></span> 1 arquivo, sem servidor</span>
+    <span class="badge" id="prefixBadge">prefixo ENJOY</span>
+  </header>
+
+  <h1>Gera keys no navegador, sem banco e sem internet.</h1>
+  <p class="small" style="max-width:70ch">
+    Mesmo formato e mesmo hash do servidor de licenças: <code>ENJOY-XXXXXXX-XXXXXXX-XXXXXXX</code>
+    (base32 Crockford, 100 bits, dígito verificador). O hash é <code>SHA-256("PREFIXO:" + key)</code>,
+    calculado aqui mesmo. Junto com as keys você leva o <strong>SQL de importação</strong> — sem isso a
+    key não existe no banco e não ativa. Ou use o modo offline abaixo para testar tudo local.
+  </p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="gen">Gerar</button>
+    <button role="tab" aria-selected="false" data-tab="check">Verificar</button>
+    <button role="tab" aria-selected="false" data-tab="local">Teste offline</button>
+  </div>
+
+  <!-- ============================ GERAR ============================ -->
+  <section id="tab-gen">
+    <div class="grid two">
+      <div class="card accent">
+        <h2>Parâmetros</h2>
+        <p class="small">Afetam o SQL exportado (e o teste offline).</p>
+        <div class="fields" style="margin-top:12px">
+          <label class="field">Prefixo
+            <input id="prefix" value="ENJOY" maxlength="10" spellcheck="false" />
+          </label>
+          <label class="field">Quantidade
+            <input id="count" type="number" min="1" max="500" value="5" />
+          </label>
+          <label class="field">Plano
+            <select id="plan">
+              <option value="pro">pro</option>
+              <option value="trial">trial</option>
+              <option value="lifetime">lifetime</option>
+              <option value="team">team</option>
+            </select>
+          </label>
+          <label class="field">Dispositivos
+            <input id="seats" type="number" min="1" max="20" value="1" />
+          </label>
+          <label class="field">Validade (dias)
+            <input id="days" type="number" min="1" max="3650" placeholder="vazio = nunca" value="365" />
+          </label>
+          <label class="field">E-mail (opcional)
+            <input id="email" type="email" placeholder="cliente@exemplo.com" spellcheck="false" />
+          </label>
+          <label class="field" style="grid-column:1/-1">Observação interna (opcional)
+            <input id="note" placeholder="ex.: pedido #1042 · pix" spellcheck="false" />
+          </label>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="primary" id="genBtn">Gerar keys</button>
+          <button class="tiny" id="clearBtn">limpar</button>
+        </div>
+        <div class="alert warn small" style="margin-top:12px">
+          A key só aparece aqui, uma vez. Depois disso existe apenas o hash — igual ao servidor.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="spread">
+          <div>
+            <h2>Resultado</h2>
+            <p class="small" id="resultHint">Nada gerado ainda.</p>
+          </div>
+          <div class="row">
+            <button class="tiny" id="copyTxt" disabled>copiar keys</button>
+            <button class="tiny" id="dlTxt" disabled>.txt</button>
+            <button class="tiny" id="dlCsv" disabled>.csv</button>
+            <button class="tiny" id="dlSql" disabled>.sql</button>
+          </div>
+        </div>
+        <div class="table-wrap" style="margin-top:12px">
+          <table>
+            <thead><tr><th>#</th><th>key</th><th>hash (sha-256)</th></tr></thead>
+            <tbody id="rows"><tr><td colspan="3" class="muted small" style="padding:14px 12px">As keys aparecem aqui.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <div class="spread">
+        <div>
+          <h2>SQL de importação</h2>
+          <p class="small">Cole no SQL Editor do Supabase (ou rode no psql) para as keys passarem a valer no servidor.</p>
+        </div>
+        <div class="row">
+          <button class="tiny" id="copySql" disabled>copiar SQL</button>
+          <button class="tiny" id="dlSql2" disabled>.sql</button>
+        </div>
+      </div>
+      <pre id="sqlOut" style="margin-top:12px">-- gere as keys para ver o SQL aqui</pre>
+    </div>
+  </section>
+
+  <!-- =========================== VERIFICAR ========================= -->
+  <section id="tab-check" hidden>
+    <div class="grid two">
+      <div class="card">
+        <h2>Verificar uma key</h2>
+        <p class="small">Confere formato, dígito verificador e mostra o hash que o servidor esperaria encontrar.</p>
+        <label class="field" style="margin-top:12px">Key
+          <input id="checkInput" class="mono" placeholder="ENJOY-XXXXXXX-XXXXXXX-XXXXXXX" spellcheck="false" autocomplete="off" />
+        </label>
+        <div class="row" style="margin-top:10px">
+          <button id="checkBtn">Verificar</button>
+          <button class="tiny" id="pasteBtn">colar</button>
+        </div>
+        <div id="checkOut" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h2>Como o servidor decide</h2>
+        <ol class="small" style="margin:0;padding-left:18px;color:var(--muted);line-height:1.7">
+          <li>Normaliza (maiúsculas, sem hífen, I/L→1, O→0, U→V) e tira o prefixo.</li>
+          <li>Confere o dígito verificador — erro de digitação morre aqui, sem tocar no banco.</li>
+          <li>Calcula <code>SHA-256("PREFIXO:" + 21 caracteres)</code> e procura em <code>licenses.key_hash</code>.</li>
+          <li>Checa status, validade e assentos; registra o dispositivo.</li>
+        </ol>
+        <hr class="hr" />
+        <p class="small" style="margin:0">
+          Gerador e servidor usam exatamente o mesmo alfabeto e a mesma função de hash — é por isso que uma
+          key daqui, depois do <code>INSERT</code>, ativa de primeira.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========================== TESTE LOCAL ======================== -->
+  <section id="tab-local" hidden>
+    <div class="grid two">
+      <div class="card">
+        <h2>Ativar neste navegador</h2>
+        <p class="small">
+          Simulação 100% local (sem Supabase, sem rede): as keys geradas acima ficam salvas no
+          <code>localStorage</code> deste navegador, com assentos, expiração e revogação.
+        </p>
+        <label class="field" style="margin-top:12px">Key
+          <input id="locKey" class="mono" placeholder="ENJOY-XXXXXXX-XXXXXXX-XXXXXXX" spellcheck="false" />
+        </label>
+        <label class="field" style="margin-top:8px">Nome do aparelho
+          <input id="locDevice" placeholder="Android · Chrome" spellcheck="false" />
+        </label>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="locActivate">Ativar</button>
+          <button class="tiny" id="locDeactivate">Desativar este aparelho</button>
+          <button class="tiny" id="locReset">apagar tudo</button>
+        </div>
+        <div id="locOut" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h2>Licenças locais</h2>
+        <p class="small" id="locStats">—</p>
+        <div class="table-wrap" style="margin-top:10px">
+          <table>
+            <thead><tr><th>key</th><th>plano</th><th>assentos</th><th>expira</th><th>status</th><th></th></tr></thead>
+            <tbody id="locRows"><tr><td colspan="6" class="muted small" style="padding:14px 12px">Nada por aqui ainda.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Arquivo único, zero requisições de rede. Gerado para o servidor de licenças do projeto
+    <code>license-key-server</code>. Guarde este HTML com o mesmo cuidado das keys — quem tem o arquivo
+    não consegue ativar nada sozinho (precisa do <code>INSERT</code> no seu banco), mas não publique.
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ==== core:start ==== */
+/* Núcleo puro (sem DOM) — igual ao usado em lib/keys.ts */
+(function (root) {
+  "use strict";
+
+  var ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // Crockford, sem I L O U
+  var BODY_LEN = 20;
+  var TOTAL_LEN = BODY_LEN + 1;
+  var GROUP = 7;
+
+  /* -------------------------- SHA-256 puro -------------------------- */
+  var K = [
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+  ];
+
+  function utf8Bytes(str) {
+    var out = [], i, c;
+    for (i = 0; i < str.length; i++) {
+      c = str.charCodeAt(i);
+      if (c < 0x80) out.push(c);
+      else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0xd800 || c >= 0xe000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else {
+        i++;
+        c = 0x10000 + (((c & 0x3ff) << 10) | (str.charCodeAt(i) & 0x3ff));
+        out.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      }
+    }
+    return out;
+  }
+
+  function sha256Hex(message) {
+    var bytes = utf8Bytes(String(message));
+    var H = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19];
+    var len = bytes.length;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    var bitLen = len * 8;
+    for (var s = 56; s >= 0; s -= 8) bytes.push((bitLen / Math.pow(2, s)) & 0xff);
+
+    var W = new Array(64), i, t, a, b, c, d, e, f, g, h, S0, S1, ch, maj, t1, t2, ror = function (x, n) { return (x >>> n) | (x << (32 - n)); };
+
+    for (i = 0; i < bytes.length; i += 64) {
+      for (t = 0; t < 16; t++) {
+        W[t] = (bytes[i + t * 4] << 24) | (bytes[i + t * 4 + 1] << 16) | (bytes[i + t * 4 + 2] << 8) | bytes[i + t * 4 + 3];
+      }
+      for (t = 16; t < 64; t++) {
+        var s0 = ror(W[t - 15], 7) ^ ror(W[t - 15], 18) ^ (W[t - 15] >>> 3);
+        var s1 = ror(W[t - 2], 17) ^ ror(W[t - 2], 19) ^ (W[t - 2] >>> 10);
+        W[t] = (W[t - 16] + s0 + W[t - 7] + s1) | 0;
+      }
+      a = H[0]; b = H[1]; c = H[2]; d = H[3]; e = H[4]; f = H[5]; g = H[6]; h = H[7];
+      for (t = 0; t < 64; t++) {
+        S1 = ror(e, 6) ^ ror(e, 11) ^ ror(e, 25);
+        ch = (e & f) ^ (~e & g);
+        t1 = (h + S1 + ch + K[t] + W[t]) | 0;
+        S0 = ror(a, 2) ^ ror(a, 13) ^ ror(a, 22);
+        maj = (a & b) ^ (a & c) ^ (b & c);
+        t2 = (S0 + maj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0;
+        d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      H[0] = (H[0] + a) | 0; H[1] = (H[1] + b) | 0; H[2] = (H[2] + c) | 0; H[3] = (H[3] + d) | 0;
+      H[4] = (H[4] + e) | 0; H[5] = (H[5] + f) | 0; H[6] = (H[6] + g) | 0; H[7] = (H[7] + h) | 0;
+    }
+    return H.map(function (x) { return ("00000000" + (x >>> 0).toString(16)).slice(-8); }).join("");
+  }
+
+  /* ------------------------- keys / checksum ------------------------ */
+
+  function checksum(body) {
+    var sum = 0;
+    for (var i = 0; i < body.length; i++) sum += ALPHABET.indexOf(body[i]) * (i + 2);
+    return ALPHABET[sum % ALPHABET.length];
+  }
+
+  function randomBody() {
+    var body = "", i, rnd;
+    var c = root.crypto;
+    if (c && c.getRandomValues) {
+      var buf = new Uint32Array(BODY_LEN);
+      c.getRandomValues(buf);
+      for (i = 0; i < BODY_LEN; i++) body += ALPHABET[buf[i] % 32];
+      return body;
+    }
+    for (i = 0; i < BODY_LEN; i++) body += ALPHABET[Math.floor(Math.random() * 32)];
+    return body;
+  }
+
+  function normalizePrefix(prefix) {
+    return String(prefix || "ENJOY").toUpperCase().replace(/[^0-9A-Z]/g, "") || "ENJOY";
+  }
+
+  function normalizeKey(input, prefix) {
+    var s = String(input || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+    s = s.replace(/[IL]/g, "1").replace(/O/g, "0").replace(/U/g, "V");
+    var p = normalizePrefix(prefix).replace(/[IL]/g, "1").replace(/O/g, "0").replace(/U/g, "V");
+    if (p && s.indexOf(p) === 0 && s.length > TOTAL_LEN) s = s.slice(p.length);
+    return s;
+  }
+
+  function generateKey(prefix) {
+    var body = randomBody();
+    var full = body + checksum(body);
+    var groups = full.match(new RegExp(".{1," + GROUP + "}", "g")) || [full];
+    return normalizePrefix(prefix) + "-" + groups.join("-");
+  }
+
+  function checkKey(input, prefix) {
+    var normalized = normalizeKey(input, prefix);
+    if (normalized.length !== TOTAL_LEN) {
+      return { ok: false, reason: "A key precisa ter " + TOTAL_LEN + " caracteres sem o prefixo (recebi " + normalized.length + ").", normalized: normalized };
+    }
+    for (var i = 0; i < normalized.length; i++) {
+      if (ALPHABET.indexOf(normalized[i]) === -1) {
+        return { ok: false, reason: 'Caractere inválido: "' + normalized[i] + '".', normalized: normalized };
+      }
+    }
+    var body = normalized.slice(0, BODY_LEN);
+    if (checksum(body) !== normalized[BODY_LEN]) {
+      return { ok: false, reason: "Dígito verificador não confere — key incompleta ou com caractere errado.", normalized: normalized };
+    }
+    return { ok: true, normalized: normalized, reason: "" };
+  }
+
+  function hashKey(normalized, prefix) {
+    return sha256Hex(normalizePrefix(prefix) + ":" + normalized);
+  }
+
+  function keyHint(formatted, prefix) {
+    var n = normalizeKey(formatted, prefix);
+    return { key_prefix: normalizePrefix(prefix) + "-" + n.slice(0, 3), key_hint: n.slice(-4) };
+  }
+
+  /* ------------------------------- SQL ------------------------------ */
+
+  function sqlString(v) {
+    return "'" + String(v).replace(/'/g, "''") + "'";
+  }
+
+  function buildSql(entries, opts) {
+    opts = opts || {};
+    var lines = [];
+    lines.push("-- keys geradas offline em " + new Date().toISOString());
+    lines.push("-- prefixo: " + normalizePrefix(opts.prefix) + " · plano: " + (opts.plan || "pro") + " · assentos: " + (opts.seats || 1));
+    lines.push("-- rode no SQL Editor do Supabase; idempotente por key_hash (unique)");
+    lines.push("insert into public.licenses (key_hash, key_prefix, key_hint, plan, max_devices, expires_at, email, note)");
+    lines.push("values");
+    var vals = entries.map(function (e) {
+      var expires = opts.days ? "now() + interval " + sqlString(opts.days + " days") : "null";
+      return "  (" + sqlString(e.hash) + ", " + sqlString(e.key_prefix) + ", " + sqlString(e.key_hint) + ", " +
+        sqlString(opts.plan || "pro") + ", " + (Number(opts.seats) || 1) + ", " + expires + ", " +
+        (opts.email ? sqlString(opts.email) : "null") + ", " + (opts.note ? sqlString(opts.note) : "null") + ")";
+    });
+    lines.push(vals.join(",\n"));
+    lines.push("on conflict (key_hash) do nothing;");
+    return lines.join("\n");
+  }
+
+  root.KeyGen = {
+    ALPHABET: ALPHABET,
+    sha256Hex: sha256Hex,
+    generateKey: generateKey,
+    normalizeKey: normalizeKey,
+    normalizePrefix: normalizePrefix,
+    checkKey: checkKey,
+    hashKey: hashKey,
+    keyHint: keyHint,
+    buildSql: buildSql,
+    TOTAL_LEN: TOTAL_LEN
+  };
+})(typeof window !== "undefined" ? window : globalThis);
+/* ==== core:end ==== */
+</script>
+
+<script>
+/* ============================== UI ============================== */
+(function () {
+  "use strict";
+  var KG = window.KeyGen;
+  var $ = function (id) { return document.getElementById(id); };
+  var state = { keys: [], sql: "" };
+
+  function toast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { t.classList.remove("show"); }, 1600);
+  }
+
+  function download(name, text, mime) {
+    var blob = new Blob([text], { type: mime || "text/plain;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+  }
+
+  function stamp() {
+    return new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+  }
+
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Copiado");
+    } catch (e) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); toast("Copiado"); } catch (e2) { toast("Não deu pra copiar"); }
+      ta.remove();
+    }
+  }
+
+  /* ----------------------------- tabs ----------------------------- */
+  document.querySelectorAll("[data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll("[data-tab]").forEach(function (b) {
+        b.setAttribute("aria-selected", b === btn ? "true" : "false");
+      });
+      ["gen", "check", "local"].forEach(function (name) {
+        $("tab-" + name).hidden = name !== btn.dataset.tab;
+      });
+    });
+  });
+
+  /* ----------------------------- gerar ---------------------------- */
+  function readOpts() {
+    return {
+      prefix: KG.normalizePrefix($("prefix").value),
+      plan: $("plan").value,
+      seats: Math.min(Math.max(Number($("seats").value) || 1, 1), 20),
+      days: $("days").value.trim() === "" ? null : Math.min(Math.max(Number($("days").value) || 1, 1), 3650),
+      email: $("email").value.trim() || null,
+      note: $("note").value.trim() || null
+    };
+  }
+
+  function setEnabled(on) {
+    ["copyTxt", "dlTxt", "dlCsv", "dlSql", "dlSql2", "copySql"].forEach(function (id) { $(id).disabled = !on; });
+  }
+
+  function render() {
+    var opts = readOpts();
+    var tbody = $("rows");
+    if (!state.keys.length) {
+      tbody.innerHTML = '<tr><td colspan="3" class="muted small" style="padding:14px 12px">As keys aparecem aqui.</td></tr>';
+      $("resultHint").textContent = "Nada gerado ainda.";
+      $("sqlOut").textContent = "-- gere as keys para ver o SQL aqui";
+      setEnabled(false);
+      return;
+    }
+    tbody.innerHTML = state.keys.map(function (k, i) {
+      return '<tr><td class="muted">' + (i + 1) + "</td>" +
+        '<td class="key">' + k.key + "</td>" +
+        '<td class="mono small muted" style="font-size:.68rem">' + k.hash.slice(0, 24) + "…</td></tr>";
+    }).join("");
+    $("resultHint").textContent = state.keys.length + " key(s) · " + opts.prefix + " · " + opts.plan +
+      " · " + opts.seats + " dispositivo(s) · " + (opts.days ? opts.days + " dias" : "sem validade");
+    $("sqlOut").textContent = state.sql;
+    setEnabled(true);
+  }
+
+  $("genBtn").addEventListener("click", function () {
+    var opts = readOpts();
+    $("prefix").value = opts.prefix;
+    $("prefixBadge").textContent = "prefixo " + opts.prefix;
+    var n = Math.min(Math.max(Number($("count").value) || 1, 1), 500);
+    var list = [];
+    for (var i = 0; i < n; i++) {
+      var key = KG.generateKey(opts.prefix);
+      var chk = KG.checkKey(key, opts.prefix);
+      var hint = KG.keyHint(key, opts.prefix);
+      list.push({ key: key, hash: KG.hashKey(chk.normalized, opts.prefix), key_prefix: hint.key_prefix, key_hint: hint.key_hint });
+    }
+    state.keys = list;
+    state.sql = KG.buildSql(list, opts);
+    if (window.LocalLic) window.LocalLic.importKeys(list, opts);
+    render();
+    toast(n + " key(s) geradas");
+  });
+
+  $("clearBtn").addEventListener("click", function () {
+    state.keys = [];
+    state.sql = "";
+    render();
+  });
+
+  $("copyTxt").addEventListener("click", function () {
+    copy(state.keys.map(function (k) { return k.key; }).join("\n"));
+  });
+  $("copySql").addEventListener("click", function () { copy(state.sql); });
+
+  $("dlTxt").addEventListener("click", function () {
+    download("keys-" + stamp() + ".txt", state.keys.map(function (k) { return k.key; }).join("\n"));
+  });
+
+  $("dlCsv").addEventListener("click", function () {
+    var rows = [["key", "hash", "plano", "dispositivos", "expira_em", "email", "nota"]];
+    var opts = readOpts();
+    state.keys.forEach(function (k) {
+      rows.push([k.key, k.hash, opts.plan, String(opts.seats), opts.days ? opts.days + " dias" : "nunca", opts.email || "", opts.note || ""]);
+    });
+    var csv = rows.map(function (r) {
+      return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(",");
+    }).join("\n");
+    download("keys-" + stamp() + ".csv", csv, "text/csv;charset=utf-8");
+  });
+
+  ["dlSql", "dlSql2"].forEach(function (id) {
+    $(id).addEventListener("click", function () { download("keys-" + stamp() + ".sql", state.sql, "application/sql;charset=utf-8"); });
+  });
+
+  /* ---------------------------- verificar -------------------------- */
+  function doCheck() {
+    var raw = $("checkInput").value;
+    var prefix = KG.normalizePrefix($("prefix").value);
+    var out = $("checkOut");
+    if (!raw.trim()) { out.innerHTML = '<div class="alert warn">Cole uma key primeiro.</div>'; return; }
+
+    var res = KG.checkKey(raw, prefix);
+    if (!res.ok) {
+      out.innerHTML = '<div class="alert bad">' + res.reason + "</div>";
+      return;
+    }
+    var hint = KG.keyHint(raw, prefix);
+    var hash = KG.hashKey(res.normalized, prefix);
+    out.innerHTML =
+      '<div class="alert ok" style="margin-bottom:10px">Key válida (formato + dígito verificador).</div>' +
+      '<dl class="kv">' +
+        "<dt>normalizada</dt><dd>" + res.normalized + "</dd>" +
+        "<dt>prefixo</dt><dd>" + hint.key_prefix + "</dd>" +
+        "<dt>finais</dt><dd>…" + hint.key_hint + "</dd>" +
+        "<dt>hash</dt><dd>" + hash + "</dd>" +
+      "</dl>";
+  }
+  $("checkBtn").addEventListener("click", doCheck);
+  $("checkInput").addEventListener("keydown", function (e) { if (e.key === "Enter") doCheck(); });
+  $("pasteBtn").addEventListener("click", async function () {
+    try { $("checkInput").value = await navigator.clipboard.readText(); doCheck(); }
+    catch (e) { toast("Permissão de área de transferência negada"); }
+  });
+
+  /* --------------------------- teste local ------------------------- */
+  var LS = "kg.local.v1";
+  function loadLocal() {
+    try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; }
+  }
+  function saveLocal(db) { localStorage.setItem(LS, JSON.stringify(db)); }
+
+  var LocalLic = {
+    importKeys: function (entries) {
+      var db = loadLocal();
+      var opts = readOpts();
+      entries.forEach(function (e) {
+        if (!db[e.key]) {
+          db[e.key] = {
+            hash: e.hash, plan: opts.plan, seats: opts.seats, days: opts.days,
+            email: opts.email, note: opts.note, createdAt: new Date().toISOString(),
+            devices: [], revoked: false
+          };
+        }
+      });
+      saveLocal(db);
+      LocalLic.render();
+    },
+    render: function () {
+      var db = loadLocal();
+      var keys = Object.keys(db);
+      var rows = $("locRows");
+      if (!keys.length) {
+        rows.innerHTML = '<tr><td colspan="6" class="muted small" style="padding:14px 12px">Nada por aqui ainda. Gere keys na aba "Gerar".</td></tr>';
+        $("locStats").textContent = "Nenhuma licença local. Gere keys na aba Gerar — elas entram aqui automaticamente.";
+        return;
+      }
+      var now = Date.now();
+      rows.innerHTML = keys.map(function (k) {
+        var l = db[k];
+        var used = l.devices.filter(function (d) { return !d.revoked; }).length;
+        var expired = l.days && now > new Date(l.createdAt).getTime() + l.days * 86400000;
+        var status = l.revoked ? "revogada" : expired ? "vencida" : "ativa";
+        var cls = l.revoked ? "bad" : expired ? "warn" : "ok";
+        return "<tr><td class='key'>" + k + "</td><td>" + l.plan + "</td><td>" + used + "/" + l.seats + "</td><td>" +
+          (l.days ? new Date(new Date(l.createdAt).getTime() + l.days * 86400000).toLocaleDateString("pt-BR") : "nunca") +
+          "</td><td><span class='badge " + cls + "'><span class='dot'></span>" + status + "</span></td>" +
+          "<td><button class='tiny' data-revoke='" + k + "'>" + (l.revoked ? "reativar" : "revogar") + "</button></td></tr>";
+      }).join("");
+      $("locStats").textContent = keys.length + " licença(s) local(is) · " +
+        keys.reduce(function (a, k) { return a + db[k].devices.filter(function (d) { return !d.revoked; }).length; }, 0) +
+        " dispositivo(s) ativo(s)";
+      rows.querySelectorAll("[data-revoke]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var db2 = loadLocal();
+          db2[btn.dataset.revoke].revoked = !db2[btn.dataset.revoke].revoked;
+          saveLocal(db2);
+          LocalLic.render();
+          toast("Licença " + (db2[btn.dataset.revoke].revoked ? "revogada" : "reativada"));
+        });
+      });
+    },
+    activate: function (key, device) {
+      var db = loadLocal();
+      var prefix = KG.normalizePrefix($("prefix").value);
+      var chk = KG.checkKey(key, prefix);
+      if (!chk.ok) return { ok: false, reason: chk.reason };
+
+      var found = db[key] || null;
+      if (!found) {
+        // aceita qualquer key gerada neste navegador (comparação pelo hash)
+        var h = KG.hashKey(chk.normalized, prefix);
+        var match = Object.keys(db).filter(function (k) { return db[k].hash === h; })[0];
+        if (!match) return { ok: false, reason: "Key válida no formato, mas não foi gerada/importada aqui. No servidor real ela precisa existir no banco." };
+        key = match;
+        found = db[match];
+      }
+      if (found.revoked) return { ok: false, reason: "Licença revogada." };
+      var created = new Date(found.createdAt).getTime();
+      if (found.days && Date.now() > created + found.days * 86400000) return { ok: false, reason: "Licença expirada." };
+
+      var existing = found.devices.filter(function (d) { return d.id === device; })[0];
+      if (existing && !existing.revoked) return { ok: true, reason: "Já ativa neste aparelho." };
+      if (found.devices.filter(function (d) { return !d.revoked; }).length >= found.seats) {
+        return { ok: false, reason: "Limite de " + found.seats + " dispositivo(s) atingido." };
+      }
+      found.devices.push({ id: device, activatedAt: new Date().toISOString(), revoked: false });
+      saveLocal(db);
+      LocalLic.render();
+      return { ok: true, reason: "Ativada para " + device + "." };
+    },
+    deactivate: function (key, device) {
+      var db = loadLocal();
+      var l = db[key];
+      if (!l) return { ok: false, reason: "Licença não encontrada." };
+      l.devices.forEach(function (d) { if (d.id === device) d.revoked = true; });
+      saveLocal(db);
+      LocalLic.render();
+      return { ok: true, reason: "Dispositivo desativado (assento liberado)." };
+    }
+  };
+  window.LocalLic = LocalLic;
+
+  $("locActivate").addEventListener("click", function () {
+    var device = $("locDevice").value.trim() || "este-navegador";
+    var r = LocalLic.activate($("locKey").value.trim(), device);
+    $("locOut").innerHTML = '<div class="alert ' + (r.ok ? "ok" : "bad") + '">' + r.reason + "</div>";
+  });
+  $("locDeactivate").addEventListener("click", function () {
+    var device = $("locDevice").value.trim() || "este-navegador";
+    var r = LocalLic.deactivate($("locKey").value.trim(), device);
+    $("locOut").innerHTML = '<div class="alert ' + (r.ok ? "ok" : "bad") + '">' + r.reason + "</div>";
+  });
+  $("locReset").addEventListener("click", function () {
+    if (!confirm("Apagar todas as licenças locais deste navegador?")) return;
+    localStorage.removeItem(LS);
+    LocalLic.render();
+    toast("Licenças locais apagadas");
+  });
+
+  /* ------------------------------ boot ----------------------------- */
+  $("prefixBadge").textContent = "prefixo " + KG.normalizePrefix($("prefix").value);
+  $("prefix").addEventListener("input", function () {
+    $("prefixBadge").textContent = "prefixo " + KG.normalizePrefix($("prefix").value);
+  });
+  $("locDevice").value = "Android · " + (navigator.userAgentData && navigator.userAgentData.platform
+    ? navigator.userAgentData.platform
+    : (navigator.platform || "navegador"));
+  render();
+  LocalLic.render();
+})();
+</script>
+</body>
+</html>

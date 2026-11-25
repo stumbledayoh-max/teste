@@ -259,6 +259,30 @@ E, no JS: `window.LicenseNative?.onLicense(JSON.stringify({ ok: lic.isLicensed()
 
 ---
 
+## Ferramenta offline: `ferramentas/gerador-keys.html`
+
+Um único arquivo HTML — abre com dois cliques (`file://`), **sem servidor, sem Supabase, sem internet**.
+
+- Gera N keys com o **mesmo alfabeto, mesmo dígito verificador e mesmo hash** do servidor
+  (SHA-256 puro em JS, conferido byte a byte contra o servidor).
+- Exporta `.txt`, `.csv` e o **`.sql` de importação** com `key_hash`, prefixo, finais, plano, assentos,
+  validade e e-mail. Rodou esse SQL no Supabase? As keys já ativam na API, sem tocar no código.
+- Aba **Verificar**: confere formato/verificador e mostra o hash que o servidor vai procurar.
+- Aba **Teste offline**: simula ativação, limite de assentos, expiração e revogação só com
+  `localStorage` — bom para demonstrar o fluxo sem banco nenhum.
+
+```bash
+open ferramentas/gerador-keys.html        # macOS
+xdg-open ferramentas/gerador-keys.html    # Linux
+start ferramentas\gerador-keys.html       # Windows
+```
+
+Fluxo recomendado para vender sem painel: gerar 10 keys na ferramenta → baixar o `.sql` → colar no
+SQL Editor do Supabase → entregar as keys. Para revogar depois, use o `/admin` do site.
+
+> O arquivo não fica em `public/`, então não é servido pelo deploy. Mesmo assim, guarde com cuidado:
+> quem tiver o HTML não consegue ativar nada sozinho (precisa do `INSERT` no seu banco).
+
 ## Fluxos de operação
 
 | Situação | O que fazer no painel |
