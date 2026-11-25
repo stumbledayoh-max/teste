@@ -8,7 +8,7 @@ com painel de administração e SDK pronto para navegador/WebView.
 > Ele não contorna a proteção de licença de aplicativos de terceiros.
 
 ```
-Next.js 15 (App Router)  ─┬─  /api/activate     ─┐
+Next.js 16 (App Router)  ─┬─  /api/activate     ─┐
        React 19           ├─  /api/validate      ├──  Postgres (Supabase)
        TypeScript         ├─  /api/deactivate    │    licenses
                           └─  /api/admin/*       ┘    license_devices
