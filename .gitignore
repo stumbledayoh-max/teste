@@ -1,0 +1,24 @@
+# dependências
+node_modules/
+.pnp
+.pnp.js
+
+# build
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+
+# dados locais (modo dev sem Supabase) — NUNCA commitar
+.data/
+.env
+.env*.local
+.env.production
+
+# sistema
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-error.log*
+.vercel
