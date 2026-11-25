@@ -50,6 +50,9 @@ export default function HomePage() {
             <Link href="/admin" className="badge" style={{ padding: "10px 16px", fontSize: "0.85rem" }}>
               Gerar keys no painel
             </Link>
+            <a href="/ferramentas/gerador-keys.html" className="badge" style={{ padding: "10px 16px", fontSize: "0.85rem" }}>
+              Gerador offline (HTML) ↗
+            </a>
           </div>
 
           {devToken && (
