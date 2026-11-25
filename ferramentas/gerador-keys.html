@@ -222,6 +222,11 @@
           Simulação 100% local (sem Supabase, sem rede): as keys geradas acima ficam salvas no
           <code>localStorage</code> deste navegador, com assentos, expiração e revogação.
         </p>
+        <p class="small" id="storageWarn" hidden style="color:var(--warn)">
+          Este navegador bloqueou o <code>localStorage</code> aqui (comum em <code>file://</code> ou modo
+          privado). O teste local funciona, mas as licenças somem ao fechar a aba — gerar keys, verificar
+          e exportar SQL funcionam normalmente.
+        </p>
         <label class="field" style="margin-top:12px">Key
           <input id="locKey" class="mono" placeholder="ENJOY-XXXXXXX-XXXXXXX-XXXXXXX" spellcheck="false" />
         </label>
@@ -549,7 +554,7 @@
     }
     state.keys = list;
     state.sql = KG.buildSql(list, opts);
-    if (window.LocalLic) window.LocalLic.importKeys(list, opts);
+    try { if (window.LocalLic) window.LocalLic.importKeys(list, opts); } catch (e) { /* aba local é opcional */ }
     render();
     toast(n + " key(s) geradas");
   });
@@ -616,11 +621,31 @@
   });
 
   /* --------------------------- teste local ------------------------- */
+  /* localStorage pode estar bloqueado (file:// em alguns navegadores, modo
+     privado, WebView sem domStorage). Nesse caso a aba local usa memória —
+     o gerador e o SQL continuam funcionando normalmente. */
   var LS = "kg.local.v1";
-  function loadLocal() {
-    try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; }
+  var memStore = Object.create(null);
+  var storageOk = (function () {
+    try { window.localStorage.setItem("kg.probe", "1"); window.localStorage.removeItem("kg.probe"); return true; }
+    catch (e) { return false; }
+  })();
+  function storeGet(k) {
+    if (storageOk) { try { return window.localStorage.getItem(k); } catch (e) { /* cai pro mem */ } }
+    return k in memStore ? memStore[k] : null;
   }
-  function saveLocal(db) { localStorage.setItem(LS, JSON.stringify(db)); }
+  function storeSet(k, v) {
+    if (storageOk) { try { window.localStorage.setItem(k, v); return; } catch (e) { /* cai pro mem */ } }
+    memStore[k] = v;
+  }
+  function storeDel(k) {
+    if (storageOk) { try { window.localStorage.removeItem(k); } catch (e) { /* cai pro mem */ } }
+    delete memStore[k];
+  }
+  function loadLocal() {
+    try { return JSON.parse(storeGet(LS) || "{}"); } catch (e) { return {}; }
+  }
+  function saveLocal(db) { storeSet(LS, JSON.stringify(db)); }
 
   var LocalLic = {
     importKeys: function (entries) {
@@ -725,15 +750,17 @@
   });
   $("locReset").addEventListener("click", function () {
     if (!confirm("Apagar todas as licenças locais deste navegador?")) return;
-    localStorage.removeItem(LS);
+    storeDel(LS);
     LocalLic.render();
     toast("Licenças locais apagadas");
   });
 
   /* ------------------------------ boot ----------------------------- */
+  if (!storageOk) $("storageWarn").hidden = false;
   $("prefixBadge").textContent = "prefixo " + KG.normalizePrefix($("prefix").value);
   $("prefix").addEventListener("input", function () {
-    $("prefixBadge").textContent = "prefixo " + KG.normalizePrefix($("prefix").value);
+    if (!storageOk) $("storageWarn").hidden = false;
+  $("prefixBadge").textContent = "prefixo " + KG.normalizePrefix($("prefix").value);
   });
   $("locDevice").value = "Android · " + (navigator.userAgentData && navigator.userAgentData.platform
     ? navigator.userAgentData.platform
